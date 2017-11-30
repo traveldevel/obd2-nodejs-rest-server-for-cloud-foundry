@@ -18,10 +18,14 @@
   },
   "homepage": "https://github.com/traveldevel/obd2-nodejs-rest-server-for-cloud-foundry#readme",
   "dependencies": {
+    "basic-auth": "^2.0.0",
     "body-parser": "^1.18.2",
     "cfenv": "^1.0.4",
+    "dotenv": "^4.0.0",
     "express": "^4.16.2",
+    "mongodb": "^2.2.33",
     "mongodb-uri": "^0.9.7",
-    "mongoose": "^4.13.5"
+    "mongoose": "^4.13.5",
+    "simple-odata-server": "^0.3.2"
   }
 }

@@ -1,6 +1,40 @@
 "use strict";
 
+// Load env vars from .env
+require('dotenv').config();
+
 const port = process.env.PORT || 8080;
+const authorizedUsers = process.env.BASIC_AUTH_USERS.split(',');
+const authorizedUserPasswords = process.env.BASIC_AUTH_USER_PASSWORDS.split(',');
+
+const ODataServer = require("simple-odata-server");
+const basicAuth = require('basic-auth');
+const MongoClient = require('mongodb').MongoClient;
+
+// auth global function
+const auth = function (req, res, next) {
+    
+    if(req.method === "OPTIONS"){
+        return next();
+    }
+
+    function unauthorized(res) {
+        res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+        return res.sendStatus(401);
+    };
+
+    var user = basicAuth(req);
+
+    if (!user || !user.name || !user.pass) {
+        return unauthorized(res);
+    };
+
+    if (authorizedUsers.indexOf(user.name) >= 0 && authorizedUserPasswords.indexOf(user.pass) >= 0) {
+        return next();
+    } else {
+        return unauthorized(res);
+    };
+};
 
 // Assign the required packages and dependencies to variables
 const express = require('express');
@@ -43,6 +77,7 @@ var mongoConnData = getMongoUrlForService("obd2_mongo_server1");
 var mongoUrl = mongoConnData.url; 
 var mongoDbName = mongoConnData.db;
 
+// mongoose models
 var mongoose = require('mongoose');
 var options = {
     useMongoClient: true,
@@ -88,9 +123,74 @@ var obdRecordSchema = mongoose.Schema({
 
 var obdRecord = mongoose.model('obdRecord', obdRecordSchema);
 
+// odata service model
+var model = {
+    namespace: mongoDbName,
+    entityTypes: {
+        'obdrecords':{
+            "_id": { "type": "Edm.String", key: true},
+            "receivedId": { "type": "Edm.Integer"},
+            "receivedDate": { "type": "Edm.DateTime"},
+            "obdVin": { "type": "Edm.String"},
+            "recordedTimestamp": { "type": "Edm.Integer"},
+            "manualOdometer": { "type": "Edm.Integer"},
+
+            "obdSpeed": { "type": "Edm.Integer"},
+            "obdRpm": { "type": "Edm.Integer"},
+            "obdThrotlePosition": { "type": "Edm.Integer"},
+            "obdEngineLoad": { "type": "Edm.Integer"},
+            "obdCoolantTemp": { "type": "Edm.Integer"},
+            "obdOilTemp": { "type": "Edm.Integer"},
+
+            "gpsLatitude": { "type": "Edm.Decimal"},
+            "gpsLongitude": { "type": "Edm.Decimal"},
+            "gpsAltitude": { "type": "Edm.Integer"},
+            "gpsSpeed":  { "type": "Edm.Integer"},
+            "gpsBearing":  { "type": "Edm.Integer"},
+            "gpsAccuracy":  { "type": "Edm.Integer"},
+            "orientDir": { "type": "Edm.String"},
+        
+            "accelerationX": { "type": "Edm.Decimal"},
+            "accelerationY": { "type": "Edm.Decimal"},
+            "accelerationZ": { "type": "Edm.Decimal"},
+            "accelerationTotal": { "type": "Edm.Decimal"}            
+        }
+    },   
+    entitySets: {}
+};
+
+model.entitySets["obdrecords"] = { entityType: mongoDbName + ".obdrecords" };
+    
+// Instantiates ODataServer and assigns to odataserver variable.
+var odataServer = ODataServer().model(model);
+odataServer.cors('*');
+
+odataServer.error(function(req, res, error, next){
+    console.log(err);
+    next();
+})
+
+// Connection to database in MongoDB fo odata server
+var mongoClient = require('mongodb').MongoClient;
+
+MongoClient.connect(mongoUrl, function(err, db) {
+    
+    if(err){
+        console.log(err);
+    }
+
+    odataServer.onMongo(function(cb) { cb(err, db); });
+});
+
+// express app
 var app = express();
 
 app.use(bodyParser.json());
+
+// The directive to set app route path for odata backend
+app.use("/odata", auth, function (req, res) {
+    odataServer.handle(req, res);
+});
 
 app.post('/', function(req, res) {
     console.log(req.body);
