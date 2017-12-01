@@ -123,6 +123,22 @@ var obdRecordSchema = mongoose.Schema({
 
 var obdRecord = mongoose.model('obdRecord', obdRecordSchema);
 
+var obdTripSchema = mongoose.Schema({
+    
+    receivedId: 'Number',
+    receivedDate: 'Date',
+    obdVin: 'String',
+    startUTCTicks : 'Number',
+    endUTCTicks : 'Number',
+    totalMinutes : 'Number',
+    manualStartOdometer : 'Number',
+    estimatedEndOdometer : 'Number',
+    estimatedDistance : 'Number',
+    averageSpeed : 'Number'
+});
+
+var obdTrip = mongoose.model('obdTrip', obdTripSchema);
+
 // odata service model
 var model = {
     namespace: mongoDbName,
@@ -154,12 +170,25 @@ var model = {
             "accelerationY": { "type": "Edm.Decimal"},
             "accelerationZ": { "type": "Edm.Decimal"},
             "accelerationTotal": { "type": "Edm.Decimal"}            
+        },
+        'obdtrips':{
+            "_id": { "type": "Edm.String", key: true},
+            "receivedId": { "type": "Edm.Integer"},
+            "obdVin": { "type": "Edm.String"},
+            "startUTCTicks": { "type": "Edm.Integer"},
+            "endUTCTicks": { "type": "Edm.Integer"},
+            "totalMinutes": { "type": "Edm.Decimal"},
+            "manualStartOdometer": { "type": "Edm.Integer"},
+            "estimatedEndOdometer": { "type": "Edm.Integer"},
+            "estimatedDistance": { "type": "Edm.Decimal"},
+            "averageSpeed": { "type": "Edm.Decimal"}
         }
     },   
     entitySets: {}
 };
 
 model.entitySets["obdrecords"] = { entityType: mongoDbName + ".obdrecords" };
+model.entitySets["obdtrips"] = { entityType: mongoDbName + ".obdtrips" };
     
 // Instantiates ODataServer and assigns to odataserver variable.
 var odataServer = ODataServer().model(model);
@@ -192,7 +221,53 @@ app.use("/odata", auth, function (req, res) {
     odataServer.handle(req, res);
 });
 
-app.post('/', function(req, res) {
+app.post('/postTrips', function(req, res) {
+    console.log(req.body);
+    
+    var n = req.body.length;
+    console.log(n, " trips received");
+
+    var saved = [];
+    
+    for(var i = 0; i < n; i++){
+
+        var received = req.body[i];
+
+        var trip = new obdTrip({
+            
+            receivedId: received.id,
+            receivedDate: new Date(),
+            obdVin: received.obdVin,
+            startUTCTicks : received.startUTCTicks,
+            endUTCTicks : received.endUTCTicks,
+            totalMinutes : received.totalMinutes,
+            manualStartOdometer : received.manualStartOdometer,
+            estimatedEndOdometer : received.estimatedEndOdometer,
+            estimatedDistance : received.estimatedDistance,
+            averageSpeed : received.averageSpeed
+        });
+        
+        trip.save(function (err, savedTrip) {
+            if (err) {
+                res.json(err);     
+                res.end();           
+                return console.error(err);
+            }
+        
+            console.log(savedTrip);
+
+            saved.push(savedTrip);
+            console.log(saved.length, " trips saved");
+
+            if(saved.length === n){
+                res.json(saved);
+                res.end();
+            }
+        });
+    }
+});
+
+app.post('/postObd', function(req, res) {
     console.log(req.body);
 
     var n = req.body.length;
