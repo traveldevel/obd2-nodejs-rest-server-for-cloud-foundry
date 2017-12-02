@@ -1,6 +1,6 @@
 applications:
  - name: obd_rest_server
-   memory: 64M
+   memory: 128M
    disk_quota: 128M
    buildpack: https://github.com/cloudfoundry/nodejs-buildpack
    services:
